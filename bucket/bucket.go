@@ -1,4 +1,4 @@
-package main
+package bucket
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 )
 
 // bucket builder
-type BucketBuilder struct {
+type Builder struct {
 	name         string
 	capacity     int
 	refillTokens int
@@ -14,8 +14,8 @@ type BucketBuilder struct {
 	ch           chan struct{}
 }
 
-func NewBucketBuilder() *BucketBuilder {
-	return &BucketBuilder{ // default value
+func NewBuilder() *Builder {
+	return &Builder{ // default value
 		name:         "default",
 		capacity:     100,
 		refillTokens: 10,
@@ -23,27 +23,27 @@ func NewBucketBuilder() *BucketBuilder {
 	}
 }
 
-func (b *BucketBuilder) SetName(n string) *BucketBuilder {
+func (b *Builder) SetName(n string) *Builder {
 	b.name = n
 	return b
 }
 
-func (b *BucketBuilder) SetCapacity(c int) *BucketBuilder {
+func (b *Builder) SetCapacity(c int) *Builder {
 	b.capacity = c
 	return b
 }
 
-func (b *BucketBuilder) SetRefillTokens(r int) *BucketBuilder {
+func (b *Builder) SetRefillTokens(r int) *Builder {
 	b.refillTokens = r
 	return b
 }
 
-func (b *BucketBuilder) SetRefillPeriod(p time.Duration) *BucketBuilder {
+func (b *Builder) SetRefillPeriod(p time.Duration) *Builder {
 	b.refillPeriod = p
 	return b
 }
 
-func (b *BucketBuilder) Build() (*bucket, error) {
+func (b *Builder) Build() (*bucket, error) {
 	if b.capacity <= 0 {
 		return nil, fmt.Errorf("invalid capacity: %d", b.capacity)
 	}
@@ -60,7 +60,7 @@ func (b *BucketBuilder) Build() (*bucket, error) {
 	go func(ch chan struct{}, n string, r int, p time.Duration) {
 		defer func() {
 			close(ch)
-			fmt.Println("token refill goroutine has terminated. name= ", n)
+			fmt.Println("token refill goroutine has terminated. name: ", n)
 		}()
 
 		for {
@@ -80,7 +80,7 @@ func (b *BucketBuilder) Build() (*bucket, error) {
 		refillTokens: b.refillTokens,
 		refillPeriod: b.refillPeriod,
 		ch:           ch,
-		done:         done,
+		Done:         done,
 	}, nil
 }
 
@@ -91,7 +91,7 @@ type bucket struct {
 	refillTokens int
 	refillPeriod time.Duration
 	ch           chan struct{}
-	done         chan struct{}
+	Done         chan struct{}
 }
 
 func (b *bucket) TryConsume() bool {
@@ -105,7 +105,7 @@ func (b *bucket) TryConsume() bool {
 
 func (b *bucket) Close() {
 	fmt.Println("close bucket. name: ", b.name)
-	close(b.done)
+	close(b.Done)
 }
 
 func refillTokens(ch chan struct{}, r int) {

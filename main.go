@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"project/bucket"
 	"time"
 )
 
 func main() {
-	bucket, _ := NewBucketBuilder().
+	bucket, _ := bucket.NewBuilder().
 		SetName("my bucket").
 		SetCapacity(1000).
 		SetRefillTokens(100).
@@ -34,6 +35,6 @@ func main() {
 	fmt.Println("phase 2 count: ", count)
 
 	bucket.Close()
-	<-bucket.done
+	<-bucket.Done
 	time.Sleep(5 * time.Second)
 }
