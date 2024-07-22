@@ -47,6 +47,12 @@ func (b *Builder) Build() (*bucket, error) {
 	if b.capacity <= 0 {
 		return nil, fmt.Errorf("invalid capacity: %d", b.capacity)
 	}
+	if b.refillTokens <= 0 {
+		return nil, fmt.Errorf("invalid refill tokens: %v", b.refillTokens)
+	}
+	if b.refillPeriod <= 0 {
+		return nil, fmt.Errorf("invalid refill period: %v", b.refillPeriod)
+	}
 	// TODO: validation 추가.
 
 	ch := make(chan struct{}, b.capacity)
@@ -58,7 +64,9 @@ func (b *Builder) Build() (*bucket, error) {
 	fmt.Println("fill a channel to its capacity. name: ", b.name)
 
 	go func(ch chan struct{}, n string, r int, p time.Duration) {
+		ticker := time.NewTicker(p)
 		defer func() {
+			ticker.Stop()
 			close(ch)
 			fmt.Println("token refill goroutine has terminated. name: ", n)
 		}()
@@ -67,8 +75,7 @@ func (b *Builder) Build() (*bucket, error) {
 			select {
 			case <-done:
 				return
-			default:
-				time.Sleep(p)
+			case <-ticker.C:
 				refillTokens(ch, r)
 			}
 		}
