@@ -43,7 +43,7 @@ func (b *Builder) SetRefillPeriod(p time.Duration) *Builder {
 	return b
 }
 
-func (b *Builder) Build() (*bucket, error) {
+func (b *Builder) Build() (*Bucket, error) {
 	if b.capacity <= 0 {
 		return nil, fmt.Errorf("invalid capacity: %d", b.capacity)
 	}
@@ -81,7 +81,7 @@ func (b *Builder) Build() (*bucket, error) {
 		}
 	}(ch, b.name, b.refillTokens, b.refillPeriod)
 
-	return &bucket{
+	return &Bucket{
 		name:         b.name,
 		capacity:     b.capacity,
 		refillTokens: b.refillTokens,
@@ -91,8 +91,8 @@ func (b *Builder) Build() (*bucket, error) {
 	}, nil
 }
 
-// bucket
-type bucket struct {
+// Bucket
+type Bucket struct {
 	name         string
 	capacity     int
 	refillTokens int
@@ -101,7 +101,7 @@ type bucket struct {
 	Done         chan struct{}
 }
 
-func (b *bucket) TryConsume() bool {
+func (b *Bucket) TryConsume() bool {
 	select {
 	case <-b.ch:
 		return true
@@ -110,7 +110,7 @@ func (b *bucket) TryConsume() bool {
 	}
 }
 
-func (b *bucket) Close() {
+func (b *Bucket) Close() {
 	fmt.Println("close bucket. name: ", b.name)
 	close(b.Done)
 }

@@ -1,40 +1,62 @@
 package main
 
 import (
-	"fmt"
-	"project/bucket"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"project/middleware"
 	"time"
 )
 
 func main() {
-	bucket, _ := bucket.NewBuilder().
-		SetName("my bucket").
-		SetCapacity(1000).
-		SetRefillTokens(100).
-		SetRefillPeriod(time.Second).
-		Build()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/request", handleRequest)
 
-	ok := true
-	count := 0
-	for ok {
-		time.Sleep(5 * time.Millisecond)
-		ok = bucket.TryConsume()
-		count++
+	srv := &http.Server{
+		Addr:              ":8080",
+		Handler:           middleware.LimitByIp(mux),
+		IdleTimeout:       time.Minute,
+		ReadHeaderTimeout: 30 * time.Second,
 	}
-	fmt.Println("phase 1 count: ", count)
 
-	time.Sleep(5 * time.Second)
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
 
-	count = 0
-	ok = true
-	for ok {
-		time.Sleep(5 * time.Millisecond)
-		ok = bucket.TryConsume()
-		count++
+		for {
+			if <-c == os.Interrupt {
+				_ = srv.Close()
+				return
+			}
+		}
+	}()
+
+	err := srv.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+		return
 	}
-	fmt.Println("phase 2 count: ", count)
 
-	bucket.Close()
-	<-bucket.Done
-	time.Sleep(5 * time.Second)
+	log.Println("Server stopped")
+}
+
+func handleRequest(w http.ResponseWriter, req *http.Request) {
+	log.Printf("handleRequest url: %v\n", req.URL)
+	w.WriteHeader(200)
+	_, err := w.Write([]byte("Success"))
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+}
+
+func sendRequest(URL string) *http.Response {
+	log.Printf("Sending request to %s\n", URL)
+	resp, err := http.Get(URL)
+	if err != nil {
+		log.Fatal("Error sending request: ", err)
+		return nil
+	}
+	return resp
 }
