@@ -49,6 +49,36 @@ func LimitByIp(next http.Handler) http.Handler {
 	)
 }
 
+func LimitByPath(next http.Handler) http.Handler {
+	rateLimiter := &rateLimiter{
+		bucketMap: make(map[string]*bucket.Bucket),
+	}
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			if !rateLimiter.allow(r.URL.Path) {
+				http.Error(w, "Path Rate limit exceeded", http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		},
+	)
+}
+
+func LimitByRequest(next http.Handler) http.Handler {
+	rateLimiter := &rateLimiter{
+		bucketMap: make(map[string]*bucket.Bucket),
+	}
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			if !rateLimiter.allow("key") {
+				http.Error(w, "Server is Busy..", http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		},
+	)
+}
+
 func getClientIp(r *http.Request) string {
 	xff := r.Header.Get("X-Forwarded-For")
 	if xff != "" {
