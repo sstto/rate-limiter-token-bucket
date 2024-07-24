@@ -11,8 +11,11 @@ import (
 )
 
 type rateLimiter struct {
-	bucketMap map[string]*bucket.Bucket
-	lock      sync.Mutex
+	bucketMap    map[string]*bucket.Bucket
+	lock         sync.Mutex
+	capacity     int
+	refillPeriod time.Duration
+	refillTokens int
 }
 
 func (r *rateLimiter) allow(key string) bool {
@@ -24,9 +27,9 @@ func (r *rateLimiter) allow(key string) bool {
 		r.lock.Lock()
 		defer r.lock.Unlock()
 		newBucket, _ := bucket.NewBuilder().
-			SetCapacity(10).
-			SetRefillPeriod(60 * time.Second).
-			SetRefillTokens(10).
+			SetCapacity(r.capacity).
+			SetRefillPeriod(r.refillPeriod).
+			SetRefillTokens(r.refillTokens).
 			Build()
 		r.bucketMap[key] = newBucket
 		log.Printf("make new bucket key:%v\n", key)
@@ -34,9 +37,43 @@ func (r *rateLimiter) allow(key string) bool {
 	}
 }
 
-func LimitByIp(next http.Handler) http.Handler {
+type RateLimiterBuilder struct {
+	next         http.Handler
+	capacity     int
+	refillPeriod time.Duration
+	refillTokens int
+}
+
+func NewRateLimiter(next http.Handler) *RateLimiterBuilder {
+	return &RateLimiterBuilder{ // default value
+		next:         next,
+		capacity:     1000,
+		refillPeriod: 10 * time.Second,
+		refillTokens: 100,
+	}
+}
+
+func (b *RateLimiterBuilder) SetCapacity(c int) *RateLimiterBuilder {
+	b.capacity = c
+	return b
+}
+
+func (b *RateLimiterBuilder) SetRefillPeriod(p time.Duration) *RateLimiterBuilder {
+	b.refillPeriod = p
+	return b
+}
+
+func (b *RateLimiterBuilder) SetRefillTokens(t int) *RateLimiterBuilder {
+	b.refillTokens = t
+	return b
+}
+
+func (b *RateLimiterBuilder) LimitByIp() http.Handler {
 	rateLimiter := &rateLimiter{
-		bucketMap: make(map[string]*bucket.Bucket),
+		bucketMap:    make(map[string]*bucket.Bucket),
+		capacity:     b.capacity,
+		refillPeriod: b.refillPeriod,
+		refillTokens: b.refillTokens,
 	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -44,14 +81,17 @@ func LimitByIp(next http.Handler) http.Handler {
 				http.Error(w, "IP Rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
-			next.ServeHTTP(w, r)
+			b.next.ServeHTTP(w, r)
 		},
 	)
 }
 
-func LimitByPath(next http.Handler) http.Handler {
+func (b *RateLimiterBuilder) LimitByPath() http.Handler {
 	rateLimiter := &rateLimiter{
-		bucketMap: make(map[string]*bucket.Bucket),
+		bucketMap:    make(map[string]*bucket.Bucket),
+		capacity:     b.capacity,
+		refillPeriod: b.refillPeriod,
+		refillTokens: b.refillTokens,
 	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -59,14 +99,17 @@ func LimitByPath(next http.Handler) http.Handler {
 				http.Error(w, "Path Rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
-			next.ServeHTTP(w, r)
+			b.next.ServeHTTP(w, r)
 		},
 	)
 }
 
-func LimitByRequest(next http.Handler) http.Handler {
+func (b *RateLimiterBuilder) LimitByRequest() http.Handler {
 	rateLimiter := &rateLimiter{
-		bucketMap: make(map[string]*bucket.Bucket),
+		bucketMap:    make(map[string]*bucket.Bucket),
+		capacity:     b.capacity,
+		refillPeriod: b.refillPeriod,
+		refillTokens: b.refillTokens,
 	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +117,7 @@ func LimitByRequest(next http.Handler) http.Handler {
 				http.Error(w, "Server is Busy..", http.StatusTooManyRequests)
 				return
 			}
-			next.ServeHTTP(w, r)
+			b.next.ServeHTTP(w, r)
 		},
 	)
 }

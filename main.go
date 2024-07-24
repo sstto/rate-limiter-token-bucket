@@ -12,10 +12,15 @@ import (
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/request", handleRequest)
+	handler := middleware.NewRateLimiter(mux).
+		SetCapacity(10).
+		SetRefillPeriod(60 * time.Second).
+		SetRefillTokens(10).
+		LimitByIp()
 
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           middleware.LimitByIp(mux),
+		Handler:           handler,
 		IdleTimeout:       time.Minute,
 		ReadHeaderTimeout: 30 * time.Second,
 	}
